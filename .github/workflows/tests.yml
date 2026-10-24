@@ -21,7 +21,7 @@ jobs:
       - name: Source and syntax
         run: |
           git rev-parse HEAD 'HEAD^{tree}'
-          sha256sum node-reinstall Makefile test/helper.bash test/guard-env.bash test/stub-command test/run.bash test/node-reinstall.bats
+          sha256sum node-reinstall Makefile test/helper.bash test/guard-env.bash test/stub-command test/run.bash test/node-reinstall.bats test/assert-no-network.py
           bash --version | head -n 1
           .test-tools/bats-core/bin/bats --version
           bash -n node-reinstall test/helper.bash test/guard-env.bash test/stub-command test/run.bash
@@ -29,8 +29,7 @@ jobs:
       - name: Run isolated unit tests
         run: |
           sudo unshare --net -- bash -euc '
-            cat /proc/net/route
-            test "$(wc -l < /proc/net/route)" -eq 1
+            python3 test/assert-no-network.py
             make test BATS="$PWD/.test-tools/bats-core/bin/bats"
           '
           git diff --exit-code

@@ -47,3 +47,6 @@ unchanged.
 suite on Ubuntu after fetching the pinned Bats source. Both CI configurations
 run tests in a network namespace with no routes; neither invokes the repository's
 install target. Travis must be enabled separately by the repository owner.
+The CI guard uses Python 3 and iproute2 to check both route tables and requires
+IPv4/IPv6 connection probes to return `ENETUNREACH`. It accepts empty and
+header-only procfs displays without treating a timeout as proof of isolation.
