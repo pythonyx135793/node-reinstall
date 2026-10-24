@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 4a8f60e3e09cc03db21db3e1eb89c51ff1f97028
+          ref: c491c8fe0233b4e58a488bac0ebd369690fcf747
           persist-credentials: false
       - name: Fetch pinned Bats source
         run: |
