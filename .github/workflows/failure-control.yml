@@ -1,0 +1,52 @@
+name: Bats assertion failure control
+on:
+  push:
+    branches: [codex/bats-failure-control-r818]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 1a801c6557514e59a66c6fb7566ad54f8b8e4657
+          persist-credentials: false
+      - name: Fetch pinned Bats source
+        run: |
+          git clone --depth 1 --branch v1.14.0 https://github.com/bats-core/bats-core.git .test-tools/bats-core
+          test "$(git -C .test-tools/bats-core rev-parse HEAD)" = eb7f42f8d608ac693d7a4b67474f6714ea68cfc5
+      - name: One assertion failure through make test
+        run: |
+          git rev-parse HEAD 'HEAD^{tree}'
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('node-reinstall')
+          original = source.read_bytes()
+          assert original.count(b'VERSION="0.0.17"') == 1
+          source.write_bytes(original.replace(b'VERSION="0.0.17"', b'VERSION="0.0.18"', 1))
+          PY
+          cat > .test-tools/bats-version-control <<'SH'
+          #!/bin/bash
+          exec "$PWD/.test-tools/bats-core/bin/bats" --filter '^both version flags' "$@"
+          SH
+          chmod +x .test-tools/bats-version-control
+          set +e
+          sudo unshare --net -- bash -euc '
+            cat /proc/net/route
+            test "$(wc -l < /proc/net/route)" -eq 1
+            make test BATS="$PWD/.test-tools/bats-version-control"
+          ' > .test-tools/failure-control.log 2>&1
+          result=$?
+          set -e
+          cat .test-tools/failure-control.log
+          git restore --source=HEAD -- node-reinstall
+          git diff --exit-code
+          test "$result" -eq 2
+          grep -Fx '1..1' .test-tools/failure-control.log
+          grep -F 'not ok 1 both version flags report the script version without installer calls' .test-tools/failure-control.log
+          grep -F '"$output" == 0.0.17' .test-tools/failure-control.log
+          test "$(git hash-object node-reinstall)" = 84afc2821fccc83cd62c20d463c9d2225b5f9dd8
+          echo 'CONTROL PASS: real version assertion failed; make propagated exit 2; exact source restored.'
