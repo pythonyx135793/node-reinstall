@@ -28,6 +28,18 @@ for family in ("-4", "-6"):
     if routes != []:
         raise SystemExit("Expected an isolated network namespace with no routes")
 
+address_result = subprocess.run(
+    ["ip", "-j", "-6", "address", "show"],
+    check=True, capture_output=True, text=True, timeout=5,
+)
+ipv6_addresses = [
+    address
+    for interface in json.loads(address_result.stdout)
+    for address in interface["addr_info"]
+    if address.get("family") == "inet6"
+]
+print(f"IPv6 source addresses: {ipv6_addresses!r}", flush=True)
+
 # No route exists, so these documentation-address probes cannot leave the
 # namespace. A timeout/refusal is not accepted as proof of network isolation.
 for family, address in (
@@ -38,6 +50,10 @@ for family, address in (
         probe.settimeout(1)
         result = probe.connect_ex(address)
     print(f"{address[0]}: {errno.errorcode.get(result, result)}", flush=True)
-    if result != errno.ENETUNREACH:
-        raise SystemExit("Expected ENETUNREACH from the isolated namespace")
-print("Network isolation verified: no IPv4/IPv6 routes; both probes unreachable.")
+    if result == errno.ENETUNREACH:
+        continue
+    if family == socket.AF_INET6 and result == errno.EADDRNOTAVAIL and not ipv6_addresses:
+        print("IPv6 probe has no source address in this namespace.", flush=True)
+        continue
+    raise SystemExit("Expected no route, or IPv6 EADDRNOTAVAIL with no IPv6 addresses")
+print("Network isolation verified: no routes; IPv4 unreachable; IPv6 unreachable or addressless.")
